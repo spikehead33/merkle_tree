@@ -53,24 +53,20 @@ impl MerkleTree {
     fn make_leaves(input: &[Data]) -> Vec<MerkleTree> {
         input
             .iter()
-            .map(hash_data)
-            .map(MerkleTree::make_leaf)
+            .map(|xs| MerkleTree::make_leaf(hash_data(xs)))
             .collect()
     }
 
     fn make_root(mut queue: VecDeque<MerkleTree>) -> Option<MerkleTree> {
         loop {
             match (queue.pop_front(), queue.pop_front()) {
-                (Some(left), Some(right)) => {
+                (Some(left), Some(right)) => if left.level < right.level {
                     // handle odd number case
-                    if left.level < right.level {
-                        queue.push_back(left);
-                        queue.push_front(right);
-                        continue;
-                    }
-
+                    queue.push_back(left);
+                    queue.push_front(right);
+                } else {
                     queue.push_back(MerkleTree::merge_tree(left, right))
-                }
+                },
                 (Some(node), None) => break Some(node),
                 _ => break None,
             }
@@ -234,6 +230,32 @@ mod tests {
         ));
         assert!(!MerkleTree::verify_proof(
             data.get(3).unwrap(),
+            &proof1,
+            &tree.root()
+        ));
+
+        let data = example_data(3);
+        let tree = MerkleTree::construct(&data);
+        let proof0 = tree.prove(data.get(0).unwrap()).unwrap();
+        let proof1 = tree.prove(data.get(1).unwrap()).unwrap();
+        let proof2 = tree.prove(data.get(2).unwrap()).unwrap();
+        assert!(MerkleTree::verify_proof(
+            data.get(0).unwrap(),
+            &proof0,
+            &tree.root()
+        ));
+        assert!(MerkleTree::verify_proof(
+            data.get(1).unwrap(),
+            &proof1,
+            &tree.root()
+        ));
+        assert!(MerkleTree::verify_proof(
+            data.get(2).unwrap(),
+            &proof2,
+            &tree.root()
+        ));
+        assert!(!MerkleTree::verify_proof(
+            data.get(2).unwrap(),
             &proof1,
             &tree.root()
         ))
